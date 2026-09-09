@@ -1,0 +1,18 @@
+# Everything in this folder is local working material EXCEPT the published pages,
+# their screenshots, and this README. Deny by default, then allow the few files
+# that belong in the public repo.
+
+*
+!.gitignore
+!README.md
+!graft-guide.html
+!graft-in-practice.html
+!img/
+!img/*.png
+
+# Explicit reminders of what must never be committed:
+#   larql_copy/            third-party clone (chrishayuk/larql, Apache-2.0) - link upstream instead
+#   transcript.txt         verbatim transcript of someone else's video
+#   gpt6_summary.txt       derived from that transcript
+#   .ignore/               raw terminal logs containing local machine details
+#   HANDOFF.md             local session state

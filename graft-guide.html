@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Graft Guide</title>
+<meta name="color-scheme" content="dark">
+<style>
+  :root{
+    --bg:#0f172a; --card:#1e293b; --text:#e2e8f0; --text2:#cbd5e1; --muted:#94a3b8;
+    --orange:#fb923c; --teal:#2dd4bf; --border:#1e293b; --border2:#334155;
+    --code:#0b1220; --red:#f87171; --green:#4ade80;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0}
+  .wrap{max-width:920px;margin:0 auto;padding:48px 24px 120px}
+  h1{font-size:2.1rem;line-height:1.15;margin:0 0 8px;letter-spacing:-.02em}
+  h2{font-size:1.5rem;margin:56px 0 14px;padding-top:20px;border-top:1px solid var(--border2);letter-spacing:-.01em}
+  h3{font-size:1.12rem;margin:30px 0 8px;color:var(--teal)}
+  h4{font-size:1rem;margin:22px 0 6px;color:var(--text)}
+  p{color:var(--text2);margin:0 0 14px}
+  .lede{font-size:1.1rem;color:var(--text);margin-bottom:26px}
+  a{color:var(--orange)}
+  code{font-family:ui-monospace,SFMono-Regular,"Cascadia Code",Consolas,monospace;font-size:.88em;background:#0b1220;border:1px solid var(--border2);border-radius:4px;padding:1px 5px;color:var(--orange)}
+  pre{background:var(--code);border:1px solid var(--border2);border-left:3px solid var(--orange);border-radius:6px;padding:14px 16px;overflow-x:auto;font-size:.82rem;line-height:1.5;margin:0 0 16px}
+  pre code{background:none;border:none;padding:0;color:var(--text2);font-size:1em}
+  pre.out{border-left-color:var(--teal)}
+  .card{background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:20px 22px;margin:0 0 20px}
+  .card h3{margin-top:0}
+  .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));margin-bottom:20px}
+  table{width:100%;border-collapse:collapse;margin:0 0 20px;font-size:.92rem;display:block;overflow-x:auto}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border2);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+  td code{white-space:nowrap}
+  .tag{display:inline-block;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:99px;border:1px solid var(--border2);color:var(--muted);margin-right:6px}
+  .tag.ok{color:var(--teal);border-color:#134e4a}
+  .tag.warn{color:var(--orange);border-color:#7c2d12}
+  .note{border-left:3px solid var(--teal);background:#132b32;padding:12px 16px;border-radius:0 6px 6px 0;margin:0 0 18px;color:var(--text2)}
+  .warn{border-left:3px solid var(--orange);background:#2b1c12;padding:12px 16px;border-radius:0 6px 6px 0;margin:0 0 18px;color:var(--text2)}
+  ul,ol{color:var(--text2);padding-left:22px;margin:0 0 16px}
+  li{margin-bottom:7px}
+  .muted{color:var(--muted);font-size:.88rem}
+  hr{border:0;border-top:1px solid var(--border2);margin:40px 0}
+  .toc{background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:18px 22px;margin-bottom:36px}
+  .toc ol{margin:0;padding-left:20px;columns:2;column-gap:32px}
+  .toc a{text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+  .kv{display:grid;grid-template-columns:170px 1fr;gap:6px 16px;font-size:.92rem}
+  .kv dt{color:var(--muted)}
+  .kv dd{margin:0;color:var(--text2)}
+  .num{color:var(--teal);font-weight:600}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<h1>Graft, and how to actually use it in Claude Code</h1>
+<p class="lede">Graft builds a map of your codebase once and hands it to your coding agent, so the agent stops re-exploring the same repo on every task. This page says what it is, what it does under the hood, and gives worked examples you can copy.</p>
+
+<div class="card">
+  <h3>What is installed on this machine right now</h3>
+  <dl class="kv">
+    <dt>Package</dt><dd><code>@nanonets/graft</code> v0.16.0 (the GitHub repo is <code>trailhq/Graft</code> — the names differ, that is normal)</dd>
+    <dt>How</dt><dd><code>npm install -g @nanonets/graft</code></dd>
+    <dt>Binary</dt><dd><code>&lt;npm-global-prefix&gt;/graft</code> — on PATH, works in every folder</dd>
+    <dt>Telemetry</dt><dd>off (<code>graft telemetry disable</code>). 10 events were already queued; they will never send, because the flush checks the on/off gate first.</dd>
+    <dt>Repos wired</dt><dd class="num">none yet</dd>
+    <dt>Files touched outside the CLI</dt><dd>none. Nothing was written to <code>~/.claude</code>.</dd>
+  </dl>
+</div>
+
+<div class="toc">
+  <ol>
+    <li><a href="#problem">The problem it solves</a></li>
+    <li><a href="#what">What Graft builds</a></li>
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#cc">How it plugs into Claude Code</a></li>
+    <li><a href="#six">The six commands, with real output</a></li>
+    <li><a href="#examples">Worked examples</a></li>
+    <li><a href="#more">Blast radius, viz, monorepos</a></li>
+    <li><a href="#gotchas">Gotchas and how to undo it</a></li>
+    <li><a href="#bench">The benchmark numbers</a></li>
+    <li><a href="#next">What to do next</a></li>
+  </ol>
+</div>
+
+<h2 id="problem">1. The problem it solves</h2>
+
+<p>You ask Claude Code to change the auth flow. Claude does not know where auth lives. So it greps a word, reads a file, follows an import, backs out, greps again. Each of those steps lands in the conversation, and every later model call resends the whole conversation. You pay for that search three ways: tokens, tool calls, and wall-clock time. Then the session ends and everything Claude learned is thrown away. The next task starts from zero again.</p>
+
+<p>A human joins a codebase once. An agent joins it every single time you press enter.</p>
+
+<p>Graft's answer is to do the exploring once, up front, and save the result as files in the repo. The agent reads the map instead of rebuilding it.</p>
+
+<h2 id="what">2. What Graft builds</h2>
+
+<p>Graft writes one folder, <code>graft/</code>, at the root of your repo. It holds two different maps of the same code.</p>
+
+<div class="grid">
+  <div class="card">
+    <h3>The wiring graph</h3>
+    <p class="muted"><span class="tag ok">free</span><span class="tag ok">no API key</span><span class="tag ok">offline</span></p>
+    <p>Every function, class, method and type in the repo, plus the edges between them: who calls what, who imports what, who implements what. Built by tree-sitter, a real parser. It is deterministic — same code in, same graph out. No model is involved at any point.</p>
+    <p>Lives in <code>graft/.graph/wiring.json</code> plus one small card per source file.</p>
+  </div>
+  <div class="card">
+    <h3>The concept nodes</h3>
+    <p class="muted"><span class="tag warn">needs an LLM key</span><span class="tag warn">opt-in</span></p>
+    <p>Markdown files, one per subsystem or idea, each written in plain English: what this part does and how it connects to the rest. Links between nodes are <code>[[wikilinks]]</code> with typed verbs like <code>depends_on</code>, <code>uses</code>, <code>produces</code>.</p>
+    <p>Only built when you run <code>graft build --deep</code> with a provider key. Nothing builds these behind your back.</p>
+  </div>
+</div>
+
+<div class="note"><strong>The important split.</strong> Everything Claude Code does with Graft day to day — <code>ask</code>, <code>grep</code>, <code>skeleton</code>, <code>callers</code>, <code>map</code>, <code>blast</code> — runs on the free wiring graph. You never need an API key to get value from this. The <code>--deep</code> layer is an extra, and it is the only part that costs money.</div>
+
+<p><code>graft build</code> adds <code>graft/</code> to your <code>.gitignore</code> by itself. The graph is a local cache, like <code>node_modules</code>. You do not commit it. What you commit is the small wiring in <code>.claude/</code>, and each teammate runs <code>graft build</code> to make their own copy.</p>
+
+<h2 id="how">3. How it works</h2>
+
+<h3>The build</h3>
+<p>Graft walks the files Git can see, parses each one with tree-sitter, and writes out the symbols and the edges. Here is a real cold build of the Graft source tree itself, 265 files:</p>
+
+<pre class="out"><code>$ graft build .
+✓ wiring: 2038 nodes (1353 function, 265 file, 236 interface, 109 method, 47 type, 28 class),
+  6082 edges, 265 cards [javascript, typescript]
+  parsed: 265 of 265 files (0 replayed from cache)
+
+real    0m10.262s</code></pre>
+
+<p>Ten seconds, no key, no network. Every file is cached by a hash of its content. Run it again with nothing changed:</p>
+
+<pre class="out"><code>$ graft build .
+  parsed: 0 of 265 files (265 replayed from cache)
+
+real    0m2.052s</code></pre>
+
+<h3>Why that cheapness matters</h3>
+<p>Because a rebuild is nearly free, Graft can refresh before it answers <em>every single query</em>. When you run <code>graft ask</code>, it first checks the file sizes and timestamps against the last build's fingerprint. That check takes a few milliseconds. If nothing moved, it answers straight away. If something moved, it re-parses only what moved, then answers.</p>
+
+<p>The practical result: the answer describes your code <em>as it is right now</em>, including edits you have not saved to Git. Uncommitted, unstaged, staged — all the same to Graft. There is no stale index to remember to rebuild.</p>
+
+<p>Turn the refresh off per command with <code>--no-refresh</code>, or everywhere with <code>GRAFT_NO_REFRESH=1</code>.</p>
+
+<h3>Where the money goes</h3>
+<table>
+  <tr><th>Thing</th><th>Runs where</th><th>Costs</th></tr>
+  <tr><td><code>graft build</code>, <code>graft check</code></td><td>your machine, tree-sitter</td><td>$0, no key, no network</td></tr>
+  <tr><td><code>ask</code> <code>grep</code> <code>skeleton</code> <code>callers</code> <code>map</code> <code>blast</code></td><td>your machine, reads the graph</td><td>$0, no key, no network</td></tr>
+  <tr><td><code>graft build --deep</code></td><td>your LLM provider</td><td>your key, your model, your bill</td></tr>
+  <tr><td><code>graft blast --name</code></td><td>your LLM provider</td><td>one cached call to name the areas</td></tr>
+</table>
+
+<p>For <code>--deep</code> you pick the provider. Set <code>GRAFT_PROVIDER</code> (<code>openai</code> for anything OpenAI-compatible, <code>anthropic</code> for the native API, or <code>litellm</code> / <code>orcarouter</code> for a gateway), plus <code>GRAFT_API_KEY</code>, <code>GRAFT_MODEL</code>, and <code>GRAFT_BASE_URL</code> when you are pointing at OpenRouter, Fireworks, Groq or a local server.</p>
+
+<h3>Languages</h3>
+<p>Twenty-three, at three levels of fidelity, all free and deterministic:</p>
+<ul>
+  <li><strong>Full</strong> — hand-written extractors with cross-file call and import resolution: TypeScript / JavaScript (with JSX and TSX), Python, Go, Java, Kotlin, PHP, Swift, R.</li>
+  <li><strong>Broad</strong> — symbols plus name-matched call edges via a generic extractor: Rust, C, C++, C#, Ruby, Scala, Elixir, Solidity, OCaml, Zig, Dart, Clojure, Nix, Lua.</li>
+  <li><strong>Compiler-grade, opt-in</strong> — <code>graft build --lsp</code> adds precise edges when a language server is on your PATH: rust-analyzer, clangd, gopls, pyright, typescript-language-server. Best-effort; with no server installed the graph is unchanged.</li>
+</ul>
+<p>A file in a language not on that list is skipped, not indexed.</p>
+
+<h2 id="cc">4. How it plugs into Claude Code</h2>
+
+<p>One command does the wiring, per repo:</p>
+
+<pre><code>cd path/to/your/repo
+graft init --dry-run --agents claude   # see what it would write, write nothing
+graft init --agents claude             # actually do it</code></pre>
+
+<p>Here is the real dry-run output, so you know exactly what lands:</p>
+
+<pre class="out"><code>$ graft init . --dry-run --agents claude
+would write — this repo:
+  .claude\settings.json                 graft statusline + hook blocks
+  .claude\helpers\graft-statusline.cjs  statusline shim
+  .claude\helpers\graft-hooks.cjs       hooks shim
+  .claude\skills\graft\SKILL.md         graft skill
+  .mcp.json                             mcpServers.graft
+
+nothing was written (--dry-run)</code></pre>
+
+<p>Five files. It never touches your <code>CLAUDE.md</code>. Re-running only refreshes Graft's own blocks and leaves the rest of your settings alone.</p>
+
+<h3>The skill file</h3>
+<p><code>.claude/skills/graft/SKILL.md</code> is a normal Claude Code skill, generated for you. Its job is to tell Claude: this repo has a map, use it before you grep. It lists the six commands, says which one fits which task, and pushes hard on spending one call rather than four. If you have ever wondered what a good skill looks like, read this one — it is a tool writing its own instructions.</p>
+
+<h3>The hooks</h3>
+<p>A hook is a small script Claude Code runs by itself at a fixed moment. <code>graft init</code> installs five entries in <code>.claude/settings.json</code>:</p>
+
+<table>
+  <tr><th>Event</th><th>What it does</th><th>Budget</th></tr>
+  <tr><td><code>SessionStart</code></td><td>Hands Claude the repo map when a session opens, so it starts oriented instead of blind.</td><td>8s</td></tr>
+  <tr><td><code>UserPromptSubmit</code></td><td>Reads your prompt, finds the matching nodes, and attaches them. This is the main event — context arrives without you asking for it.</td><td>15s</td></tr>
+  <tr><td><code>PostToolUse</code> on <code>Write|Edit|MultiEdit</code></td><td>After Claude edits a file, prints the blast radius inline — what depends on the thing that just changed — and re-syncs the graph.</td><td>10s</td></tr>
+  <tr><td><code>PostToolUse</code> on <code>Bash|mcp__graft__|Read|Grep|Glob</code></td><td>Bookkeeping. Sums the "tokens saved" footers and counts graft reads against raw file reads, which is what the statusline shows.</td><td>8s</td></tr>
+  <tr><td><code>Stop</code></td><td>At the end of a turn that touched code, rebuilds the markdown cards in the background.</td><td>8s</td></tr>
+</table>
+
+<p>Every one of those is structural and free. The hooks never call an LLM on their own.</p>
+
+<h3>Two more things it writes into settings.json</h3>
+<ul>
+  <li><strong>A permissions allowlist.</strong> <code>Bash(graft:*)</code>, <code>Bash(npx graft:*)</code>, <code>Bash(graft-dev:*)</code>, <code>Bash(node dist/cli.js:*)</code>. Without it, a graft call in a headless or subagent run raises a permission prompt and loses to plain grep.</li>
+  <li><strong>A footer link regex</strong> matching <code>graft/…*.md</code>, so node paths in Claude's output are clickable.</li>
+</ul>
+
+<h3>The statusline</h3>
+<p>Graph size, percent enriched, and a <code>⚠ N stale</code> warning when the code has moved ahead of the graph, plus a running session total of tokens saved.</p>
+
+<div class="warn"><strong>Statusline trap.</strong> This is a <em>project-level</em> <code>statusLine</code>, and a project-level one hides whatever you have in <code>~/.claude/settings.json</code>. If you run a custom statusline, wire with <code>graft init --agents claude --no-statusline</code> (or set <code>GRAFT_NO_STATUSLINE=1</code>). Graft is careful in the other direction too: if a <code>statusLine</code> is already there and is not Graft's, it leaves it alone and prints a warning.</div>
+
+<h3>The MCP server</h3>
+<p><code>graft init</code> also writes <code>.mcp.json</code> so the same six capabilities show up as native tools, no shell needed. Restart Claude Code to load it.</p>
+
+<table>
+  <tr><th>Tool</th><th>Takes</th><th>Gives</th></tr>
+  <tr><td><code>graft_find_code</code></td><td>a question</td><td>Ranked hits with <code>file:line</code> and the source inlined.</td></tr>
+  <tr><td><code>graft_file_api</code></td><td>a file path</td><td>Every signature in that file, no bodies.</td></tr>
+  <tr><td><code>graft_trace_calls</code></td><td>a symbol</td><td>Who depends on it, or what it depends on, N levels deep.</td></tr>
+  <tr><td><code>graft_find_all</code></td><td>a regex</td><td>Every hit, grouped by enclosing symbol.</td></tr>
+  <tr><td><code>graft_repo_map</code></td><td>nothing</td><td>Directory clusters, hubs, hotspots.</td></tr>
+  <tr><td><code>graft_check_freshness</code></td><td>nothing</td><td>Whether the graph has drifted from the code.</td></tr>
+</table>
+
+<p>Skip it with <code>--no-mcp</code>, or run the server by hand with <code>graft mcp [dir]</code>.</p>
+
+<h2 id="six">5. The six commands, with real output</h2>
+
+<p>Everything below is real output from running Graft against its own source tree, 265 files of TypeScript, on this machine. The first line of each result is the savings footer that the hooks add up.</p>
+
+<h3>graft map — orientation</h3>
+<p>Use it when you land in a repo cold, or someone asks "explain this codebase".</p>
+
+<pre><code>graft map .</code></pre>
+<pre class="out"><code>[graft] tokens saved ≈ 611,281 (100%) — this output ≈ 331 tok vs reading the 265 file(s)
+it covers whole ≈ 611,612 tok (estimate).
+
+repo map — 265 files · 1773 symbols · 6082 edges · javascript, typescript
+
+src/       129 files · 1303 symbols   hubs: wiringPath (write.ts, 48←), buildGraph (build.ts, 38←), readGraph (write.ts, 37←)
+test/      125 files ·  392 symbols   hubs: tmpRepo (helpers.ts, 28←), fetch (app-identity.test.ts, 7←)
+viewer/      5 files ·   71 symbols   hubs: $ (main.ts, 9←), cvar (data.ts, 6←)
+scripts/     6 files ·    7 symbols   hubs: bump (graph-quality.mjs, 1←)
+
+hotspots: wiringPath · function · src/graph/write.ts:L20-L22 · 48←
+          buildGraph · function · src/graph/build.ts:L151-L410 · 38←
+          readGraph  · function · src/graph/write.ts:L28-L34 · 37←
+          contextDirFor · function · src/context/node-file.ts:L109-L112 · 30←</code></pre>
+
+<p>The <code>←</code> number is in-degree: how many other symbols point at this one. High in-degree means "lots of things break if you change this". That is the ranking for everything else in Graft.</p>
+
+<h3>graft ask — locate and understand</h3>
+<p>The default. Use it when the question is conceptual: how does X work, where does Y get handled. <code>--source</code> inlines the code, so the answer <em>is</em> the code and there is no follow-up file read.</p>
+
+<pre><code>graft ask "how does the statusline get installed into claude code settings" --source -n 3</code></pre>
+<pre class="out"><code>[graft] tokens saved ≈ 11,997 (90%) — this pack ≈ 1,266 tok vs reading the 3 source file(s)
+whole ≈ 13,263 tok.
+
+graft ask — "how does the statusline get installed into claude code settings"  (lexical)
+
+1. mergeGraftSettings · function  [symbol]
+   src/claude/settings-merge.ts:L114-L153
+   function mergeGraftSettings(existing: Json, opts: { statusline?: boolean } = {})
+     : { merged: Json; warnings: string[] }
+
+```
+export function mergeGraftSettings(
+  existing: Json,
+  opts: { statusline?: boolean } = {},
+): { merged: Json; warnings: string[] } {
+  const merged: Json = { ...(existing ?? {}) };
+  const warnings: string[] = [];
+  const wanted = statuslineWanted(opts);
+
+  applyStatusline(
+    merged, 'statusLine', warnings, wanted,
+    'Existing statusLine left untouched (a session allows only one). ...',
+  );
+  ...
+```
+
+2. installedHookTimeout · function  [symbol]
+   src/claude/hooks.ts:L111-L119</code></pre>
+
+<p>One call, and the answer names the function, the file, the exact lines, and shows the logic. Compare that to the four or five greps and two file reads a cold agent would have spent.</p>
+
+<h3>graft grep — every occurrence</h3>
+<p><code>ask</code> is ranked and returns a top few, so it <em>will</em> miss instances. When you need all of them, use grep. It searches every indexed file, groups hits by the function they sit in, and ranks by coupling.</p>
+
+<pre><code>graft grep "GRAFT_NO_STATUSLINE"</code></pre>
+<pre class="out"><code>[graft] tokens saved ≈ 7,097 (97%)
+
+"GRAFT_NO_STATUSLINE" — 7 hits in 3 symbols across 3 files (searched 265 indexed files)
+
+envNoStatusline · function · src/claude/settings-merge.ts:L77-L80 · 1 in-edges
+  L78: const v = process.env.GRAFT_NO_STATUSLINE;
+
+WiringOpts · interface · src/upkeep.ts:L167-L176 · 0 in-edges
+  L174: /** false → skip Claude Code statusLine (`--no-statusline` / GRAFT_NO_STATUSLINE). */
+
+test/claude-settings-merge.test.ts (module level) · 0 in-edges
+  L68: test('GRAFT_NO_STATUSLINE=1 skips installing a statusLine', () =&gt; {</code></pre>
+
+<p>Note what plain <code>grep -rn</code> would not have told you: which function each hit lives in, and how coupled that function is. Also useful: <code>-i</code> for case-insensitive, <code>--fixed</code> for a literal string, <code>--in &lt;path&gt;</code> to scope to a subtree.</p>
+
+<h3>graft skeleton — one file's API</h3>
+<p>Signatures only, no bodies. Use it before you edit or wire into a file, to see what you can call.</p>
+
+<pre><code>graft skeleton src/claude/statusline.ts</code></pre>
+<pre class="out"><code>[graft] tokens saved ≈ 417 (91%) — this output ≈ 43 tok vs reading the file whole ≈ 460 tok.
+
+graft skeleton — src/claude/statusline.ts
+- L16-L22  function resolveStats  function resolveStats(dir: string): Stats | null
+- L24-L35  function main          function main(): void</code></pre>
+
+<p>That file is tiny, so the saving is tiny. On a 900-line service file the ratio is the same 10:1 and the absolute number is large. Honest example rather than a flattering one.</p>
+
+<h3>graft callers — the real edges</h3>
+<p>Not a text search. These are precomputed edges from the parser, so a rename in a comment does not show up and a call through a typed receiver does.</p>
+
+<pre><code>graft callers contentHash --depth 2</code></pre>
+<pre class="out"><code>[graft] tokens saved ≈ 190,783 (99%) — this output ≈ 1,447 tok vs reading the 54 file(s)
+it covers whole ≈ 192,230 tok.
+
+contentHash · function · src/util/id.ts:L9-L11
+  calls ← batchKey (src/context/build.ts:L396-L403) [depth 1]
+      397: return contentHash(
+  calls ← buildContext (src/context/build.ts:L146-L374) [depth 1]
+      201: const hash = contentHash(code);
+  calls ← checkContext (src/context/check.ts:L38-L111) [depth 1]
+      67: current.set(relPosix(root, file), contentHash(source));
+  calls ← buildGraph (src/graph/build.ts:L151-L410) [depth 1]
+      246: const hash = contentHash(source);
+  calls ← extractFile (src/graph/extract.ts:L387-L440) [depth 1]
+      404: body_hash: contentHash(source),
+  ...
+  calls ← init (src/engine.ts:L63-L73) [depth 2]
+  calls ← context-checkpoint.test.ts (test/context-checkpoint.test.ts:L1-L97) [depth 2]</code></pre>
+
+<p>That is 54 files summarised in 1,447 tokens, with the exact call line for each one. Three modes:</p>
+<ul>
+  <li><code>graft callers Foo</code> — who calls it. Run this <em>before</em> you rename, delete, or change a signature.</li>
+  <li><code>graft callers Foo --direction out</code> — what it calls. Reading a function's dependencies without opening it.</li>
+  <li><code>graft callers Foo --depth 2</code> — the blast radius. <code>--depth all</code> gives the entire connected closure, which is what you want before a refactor that will span files.</li>
+</ul>
+<p>Symbol names can be bare (<code>Foo</code>), qualified (<code>Class.method</code>), or package-qualified (<code>pkg.Fn</code>).</p>
+
+<h3>graft check — has the graph drifted</h3>
+<p>The one command that does <em>not</em> auto-refresh, because its whole job is to report drift. Exits 1 when stale, which makes it a CI gate.</p>
+
+<pre><code>graft check .</code></pre>
+<pre class="out"><code>deep layer: not built (run `graft build --deep` for concept nodes) —
+  wiring graph is the source of truth
+
+graph check: OK — the wiring graph is in sync with the code.
+  (meaning tier 0% complete — 2038 of 2038 node(s) pending ...
+   Run `graft build --deep` to summarize them)</code></pre>
+
+<p>That "0% complete" line is expected on a free build. It means the LLM summaries were never generated. The wiring graph is fine and every command above works.</p>
+
+<h2 id="examples">6. Worked examples</h2>
+
+<p>These are things you type into Claude Code in a repo where <code>graft init</code> has run. In most of them you do not name Graft at all — the skill file and the hooks make Claude reach for it. The examples show what happens underneath so you can tell whether it worked.</p>
+
+<h3>Example 1 — Landing in a repo you have never seen</h3>
+<pre><code>You:  Give me a map of this codebase. Main subsystems, and how a request
+      gets from the HTTP layer to the database.</code></pre>
+<p><strong>Without Graft:</strong> Claude runs <code>ls</code>, opens the README, greps for "router", reads three files, greps for "db", reads two more. Eight to twelve tool calls, most of a file's worth of tokens each.</p>
+<p><strong>With Graft:</strong> the SessionStart hook has already handed Claude the repo map. It runs <code>graft map</code> once for the hub list, then one <code>graft ask "how does a request reach the database" --source</code>. Two calls. The hubs it names are ranked by in-degree, so they really are the important files, not the first ones alphabetically.</p>
+<p><strong>How to check it worked:</strong> Claude's reply should end with a line like <code>🌱 graft saved ~24,000 tokens this turn (2 calls)</code>. That line is in the skill instructions.</p>
+
+<h3>Example 2 — "Where do I add a new field type?"</h3>
+<pre><code>You:  I want to add a new collection field type. Where do I hook it in,
+      and what else has to change?</code></pre>
+<p>Claude should run one <code>graft ask "where are collection field types registered" --source</code>. The result comes back with the registry function, its <code>file:line</code>, and the code inline. Then, because you asked what <em>else</em> changes, a <code>graft callers &lt;registry symbol&gt; --depth 2</code> to find the validators and serialisers that will need the new case.</p>
+<p>This is the pattern that showed up as the biggest correctness win in Graft's own SWE-bench run: a cold agent patches one file and misses its siblings. The <code>callers --depth</code> step is what finds the siblings.</p>
+
+<h3>Example 3 — Before a rename</h3>
+<pre><code>You:  Rename `contentHash` to `hashContent` everywhere.</code></pre>
+<p>The right first move is <code>graft callers contentHash --depth 2</code>, which is the output shown above: 12 direct callers across 12 files, plus the transitive ones. Now the rename is a checklist, not a search-and-hope. Compare with a raw <code>grep -rn contentHash</code>, which also matches the string in comments, in docs, and in an unrelated variable name — and misses nothing, but tells you nothing about which hits are calls.</p>
+
+<div class="note"><strong>Prompt that works well:</strong> "Before you change anything, run <code>graft callers &lt;symbol&gt; --depth all</code> and show me the list. Then we decide the scope together."</div>
+
+<h3>Example 4 — Multi-file refactor</h3>
+<pre><code>You:  Split the settings merge logic out of settings-merge.ts into its own
+      module. Use `graft callers --depth all` first so we do not miss a file.</code></pre>
+<p><code>--depth all</code> gives the entire connected closure — every file reachable through the edges. That is deliberately wider than <code>--depth 2</code>. It is the mode for "I am about to move code between files and I need to know every import that will break".</p>
+
+<h3>Example 5 — Exhaustive audit</h3>
+<pre><code>You:  Find every place we read an environment variable, and list which ones
+      have no default.</code></pre>
+<p>This is a <code>grep</code> task, not an <code>ask</code> task, because "every place" rules out ranked top-N. Claude should run <code>graft grep "process\.env\."</code> once. The output groups hits by function and ranks them, so the ones in a hot path float to the top of the list you then review.</p>
+<p><strong>Failure mode to watch for:</strong> if Claude greps an over-specific pattern — a full guessed signature like <code>func (s *Server) GenerateHandler</code> — it gets zero hits even though the code is there. The fix in the skill is: loosen the pattern to the bare name and retry <code>graft grep</code>, do not fall back to <code>grep -rn</code>.</p>
+
+<h3>Example 6 — Reading a file you are about to edit</h3>
+<pre><code>You:  What can I call from src/claude/hooks.ts? Do not read the whole file.</code></pre>
+<p><code>graft skeleton src/claude/hooks.ts</code>. Roughly a tenth of the tokens of reading it. Then Claude opens only the one function it actually needs to change.</p>
+
+<h3>Example 7 — Debugging</h3>
+<pre><code>You:  Realtime subscriptions stop delivering events after a while.
+      Where would you start looking, and why?</code></pre>
+<p>Two calls: <code>graft ask "realtime subscription delivery" --source</code> to find the suspect, then <code>graft callers &lt;suspect&gt;</code> to see who drives it and where the lifecycle is managed. The skill explicitly budgets this one at 1–2 calls.</p>
+
+<h3>Example 8 — Reviewing someone else's diff</h3>
+<pre><code>You:  Here is the diff on this branch. What is the risk, and what should
+      I test?</code></pre>
+<p>Run <code>graft blast --base origin/main</code>. It takes the changed lines, walks the edges out from them, and tells you what areas the change can reach. Add <code>--format markdown</code> to get something you can paste as a PR comment, with per-symbol detail collapsed underneath. By default it also reads Git history to name the people behind each area, which you can turn off with <code>--no-owners</code>.</p>
+
+<h3>Example 9 — Working in one package of a monorepo</h3>
+<pre><code>You:  In the api package only: where is rate limiting enforced?</code></pre>
+<p><code>graft ask "where is rate limiting enforced" --in api/</code>. Without <code>--in</code>, Graft still ranks each sub-project separately and fuses the results — so a huge package cannot drown a small one — and every hit carries a <code>[scope/]</code> label. With <code>--in</code>, you skip straight to the package you care about.</p>
+
+<h3>Example 10 — Explicitly asking for the map</h3>
+<p>Sometimes you want to force it. All of these work as plain instructions:</p>
+<ul>
+  <li>"Use graft, do not grep."</li>
+  <li>"Run <code>graft map</code> first and show me the hubs before you touch anything."</li>
+  <li>"Answer from <code>graft ask --source</code> only. If the crux is truncated, then open the file at that exact range, nothing wider."</li>
+  <li>"Give me the graft token savings for this turn."</li>
+</ul>
+
+<h3>The whole thing as one table</h3>
+<table>
+  <tr><th>When you are…</th><th>Reach for</th><th>Calls</th></tr>
+  <tr><td>Onboarding, or "explain this codebase"</td><td><code>graft map</code>, then read the hub cards it names</td><td>1</td></tr>
+  <tr><td>Understanding a flow ("how does X work")</td><td><code>graft ask "&lt;flow&gt;" --source</code></td><td>1</td></tr>
+  <tr><td>Finding where a change belongs</td><td><code>graft ask "where is &lt;behaviour&gt;" --source</code></td><td>1</td></tr>
+  <tr><td>Editing a symbol you can already name</td><td><code>graft grep "&lt;symbol&gt;"</code>, edit at the <code>file:line</code></td><td>1</td></tr>
+  <tr><td>Renaming, deleting, changing a signature</td><td><code>graft callers &lt;sym&gt; --depth 2</code> first</td><td>1</td></tr>
+  <tr><td>Refactor across files, before editing</td><td><code>graft callers &lt;sym&gt; --depth all</code></td><td>1</td></tr>
+  <tr><td>"What does this depend on?"</td><td><code>graft callers &lt;sym&gt; --direction out</code></td><td>1</td></tr>
+  <tr><td>Every occurrence of a pattern</td><td><code>graft grep "&lt;literal&gt;"</code></td><td>1</td></tr>
+  <tr><td>"What is the API of this file?"</td><td><code>graft skeleton &lt;file&gt;</code></td><td>1</td></tr>
+  <tr><td>Debugging a failure in area X</td><td><code>graft ask "&lt;symptom&gt;" --source</code>, then <code>callers</code> on the suspect</td><td>1–2</td></tr>
+  <tr><td>Judging a diff before merge</td><td><code>graft blast --base origin/main</code></td><td>1</td></tr>
+  <tr><td>Inside one repo of a monorepo</td><td>add <code>--in &lt;scope&gt;/</code></td><td>—</td></tr>
+</table>
+
+<h2 id="more">7. Blast radius, viz, monorepos</h2>
+
+<h3>graft blast — the risk of a diff</h3>
+<pre><code>graft blast                              # working tree vs HEAD
+graft blast --base origin/main           # what a PR job would run
+graft blast --base origin/main --format markdown   # paste into a PR comment
+graft blast --depth all --format json    # full transitive closure, machine-readable
+graft blast --export-viz site/           # an interactive page for this radius
+graft blast --no-owners                  # skip "who to tag"</code></pre>
+<p>There is also a GitHub Action in the repo (<code>.github/actions/graft-blast</code>) if you want this posted automatically on pull requests.</p>
+
+<h3>graft viz — look at the graph</h3>
+<pre><code>graft viz                       # serves an interactive viewer on localhost
+graft viz --port 5000 --no-open
+graft viz --export site/ --title "PR #12"   # one self-contained index.html</code></pre>
+<p>Three tabs: <strong>Context</strong> (the markdown concept graph), <strong>Code</strong> (the per-symbol wiring graph), <strong>Outline</strong> (file → class → method as a collapsible tree). Select a node and the edges take on direction — <span style="color:var(--orange)">amber is what it depends on</span>, <span style="color:var(--teal)">teal is what depends on it</span> — with the verb written on each edge. Edges extracted by the parser draw solid; LLM-inferred ones draw dashed. The viewer live-reloads when <code>graft/</code> changes on disk.</p>
+
+<h3>Repo layouts it handles</h3>
+<ul>
+  <li><strong>Monorepo with one <code>.git</code></strong> — each sub-project is discovered as a ranking scope and ranked on its own terms, then fused.</li>
+  <li><strong>Superproject with submodules</strong> — excluded by default. <code>graft build --follow-submodules</code> folds initialised ones in; the choice is saved in <code>.graft/config.json</code>.</li>
+  <li><strong>Repos cloned inside a repo</strong> (no gitlink — what <code>west</code>, <code>repo</code>, <code>gclient</code> produce) — <code>graft build --follow-nested-repos</code>. Independent of the submodule flag.</li>
+  <li><strong>A folder of separate repos, no <code>.git</code> at the top</strong> — auto-splits. Each child gets its own <code>graft/</code>, the parent gets a <code>graft/workspace.json</code> index, queries from the parent federate across children. <code>graft init</code> at the parent wires every child too, because a session opens at a repo root and reads its instruction files from there.</li>
+</ul>
+<p>Commands also find the graph from a subdirectory — with no <code>[dir]</code> argument they walk up to the nearest <code>graft/</code>.</p>
+
+<h2 id="gotchas">8. Gotchas and how to undo it</h2>
+
+<div class="warn"><strong>1. The project statusline hides your global one.</strong> Covered above. Use <code>--no-statusline</code> if you have a custom one in <code>~/.claude/settings.json</code>.</div>
+
+<div class="warn"><strong>2. Selecting the <code>agents</code> host writes outside the repo.</strong> If <code>~/.codex/</code> exists, <code>graft init</code> registers the MCP server in <code>~/.codex/config.toml</code>, writes <code>~/.codex/hooks/graft/graft-hooks.cjs</code>, and adds a <code>PostToolUse</code> entry to <code>~/.codex/hooks.json</code>. Those are user-level: they fire in <em>every</em> repo you open with Codex. You have Codex installed, so this matters. Avoid it with <code>--agents claude</code> (which is what this guide uses throughout) or <code>--no-global</code>.</div>
+
+<div class="warn"><strong>3. <code>--deep</code> never runs by itself.</strong> Auto-sync, the hooks, and every query are structural and free. If you want the LLM concept nodes you must run <code>graft build --deep</code> yourself, with a key. That is a good default, but it means <code>graft check</code> will keep reporting "meaning tier 0% complete" and that is not an error.</div>
+
+<div class="warn"><strong>4. Never pipe graft through <code>head</code>, <code>tail</code>, or <code>sed -n</code>.</strong> Every command is already capped and states what it dropped. Clipping it costs you hits you asked for, and it silently drops the savings line the statusline's running total is parsed from.</div>
+
+<div class="warn"><strong>5. After you upgrade, <code>graft init</code> will start writing to <code>~/.claude</code>.</strong> In the installed version, 0.16.0, everything <code>graft init</code> writes for Claude Code lands inside the repo. Version 0.17.0 is on GitHub but not yet on npm, and it adds a user-level install: <code>~/.claude/helpers/graft-hooks.cjs</code>, hook blocks in <code>~/.claude/settings.json</code>, and <code>mcpServers.graft</code> in <code>~/.claude.json</code> (the user MCP scope). Those apply to every project you open with Claude Code. It exists for a real reason — a Git worktree checks out tracked files only, so a worktree of a wired repo can end up with the shims present and nothing pointing at them. But it is a behaviour change. So after <code>graft upgrade</code>, run <code>graft init --dry-run</code> once and look for a section labelled global or machine-wide. <code>--no-global</code> suppresses it: in <code>src/claude/init.ts</code> the user-level install is guarded by exactly that flag.</div>
+
+<div class="warn"><strong>6. The markdown cards can lag by one turn.</strong> The six tools always refresh before answering. But if Claude greps the markdown under <code>graft/</code> directly, those cards are a projection rebuilt at the end of a turn — so after an edit their line spans can be one turn stale. Use the tools, not the raw files.</div>
+
+<div class="note"><strong>Telemetry.</strong> Already off on this machine. For reference: the only network calls Graft makes are the LLM requests you configured, a daily npm version check, and one batched usage ping carrying buckets and fixed labels — never code, paths, repo names, symbols, queries, or error messages. <code>graft telemetry debug</code> prints exactly what would be sent. Off switches: <code>graft telemetry disable</code>, <code>DO_NOT_TRACK=1</code>, unchecking the box in <code>graft init</code>. It is off in CI and in any build from source.</div>
+
+<h3>Undoing it</h3>
+<pre><code>graft uninstall            # prints what it would remove, removes nothing
+graft uninstall -y         # actually remove every file and config entry it wrote
+graft uninstall --keep-cache   # wiring only; leave graft/ and the .gitignore line
+graft uninstall --no-global    # leave ~/.codex and ~/.gemini alone</code></pre>
+<p>And to remove the CLI itself: <code>npm uninstall -g @nanonets/graft</code>.</p>
+
+<h3>Keeping it current</h3>
+<pre><code>graft version    # installed vs latest published
+graft upgrade    # npm install -g the latest</code></pre>
+<p>A new version is announced automatically, checked once a day. After upgrading, the next session refreshes the repo's wiring by itself.</p>
+
+<h2 id="bench">9. The benchmark numbers</h2>
+
+<div class="note">These are the vendor's own measurements, published in their README. They are detailed and the method is described, which is more than most tools offer — but nobody independent has reproduced them. Read them as a claim with evidence attached, not as a settled fact.</div>
+
+<p><strong>Their controlled sweep</strong> — 162 runs, two repos, three trials each, Claude Sonnet 5 on both arms, an Opus 4.8 judge with a required-keyword floor so a fast-but-wrong answer could not win:</p>
+<table>
+  <tr><th>Mean per task</th><th>Cold Claude Code</th><th>With Graft</th></tr>
+  <tr><td>Cost</td><td>$0.0429</td><td><span class="num">$0.0292 (−32%)</span></td></tr>
+  <tr><td>Tokens</td><td>8,070</td><td><span class="num">4,650 (−42%)</span></td></tr>
+  <tr><td>Tool calls</td><td>4.2</td><td><span class="num">2.3 (−46%)</span></td></tr>
+  <tr><td>Latency</td><td>39.8s</td><td><span class="num">15.8s (−60%)</span></td></tr>
+  <tr><td>Correctness</td><td>93%</td><td>93% (equal)</td></tr>
+</table>
+
+<p>A third arm they call "pull" — tools available but nothing injected up front — gave up most of the speed and reached 98% correctness, five points above cold. Their reading: push when speed matters, pull when being right matters.</p>
+
+<p><strong>SWE-bench Verified</strong>, 50 instances, real GitHub issues graded by the official harness — your patch is applied and the maintainers' own tests are run, so there is no judge model to game:</p>
+<table>
+  <tr><th>Metric</th><th>Cold</th><th>With Graft</th><th>Change</th></tr>
+  <tr><td>Correctness</td><td>27 / 50 (54%)</td><td><span class="num">33 / 50 (66%)</span></td><td>+12 points</td></tr>
+  <tr><td>Tokens</td><td>142.0M</td><td>109.4M</td><td>−23%</td></tr>
+  <tr><td>Cost</td><td>$52.34</td><td>$42.43</td><td>−19%</td></tr>
+  <tr><td>Tool calls</td><td>1,370</td><td>1,031</td><td>−25%</td></tr>
+  <tr><td>Wall clock</td><td>13,094s</td><td>8,922s</td><td>−32%</td></tr>
+</table>
+
+<p>Their explanation of the correctness gap is the interesting part, and it matches Example 2 above: the baseline patches one file and misses its siblings. On <code>django-11532</code> it patched 1 of the 5 files the fix needs and broke 18 previously-passing tests. On <code>django-16263</code> it patched 1 of 4. The edges are what find the rest.</p>
+
+<h2 id="next">10. What to do next</h2>
+
+<ol>
+  <li>Pick one real repo — something with enough files that you actually get lost in it.</li>
+  <li><code>cd</code> into it and run <code>graft init --dry-run --agents claude</code>. Read the five lines it prints.</li>
+  <li>If you run a custom statusline, add <code>--no-statusline</code>.</li>
+  <li>Run it for real: <code>graft init --agents claude</code>. Then restart Claude Code so the MCP server loads.</li>
+  <li>Commit the wiring: <code>git add .claude .mcp.json &amp;&amp; git commit -m "wire in graft"</code>. Do not commit <code>graft/</code> — it added itself to <code>.gitignore</code>.</li>
+  <li>Ask a question you already know the answer to, and watch whether Claude reaches for <code>graft ask</code> instead of grepping. That is the test of whether the wiring took.</li>
+  <li>Optional, costs money: set <code>GRAFT_PROVIDER</code> / <code>GRAFT_API_KEY</code> / <code>GRAFT_MODEL</code> and run <code>graft build --deep</code> to add the plain-English concept nodes.</li>
+</ol>
+
+<p class="muted" style="margin-top:40px">Sources: the <code>trailhq/Graft</code> README and source at commit fetched 2026-09-08 (repo version 0.17.0), and the generated <code>SKILL.md</code>, <code>settings-merge.ts</code> and <code>claude-global.ts</code> in that tree. All command output on this page was produced by running <code>@nanonets/graft</code> v0.16.0 against the Graft source tree on this machine. npm's latest published version is 0.16.0; the repo's main branch is ahead at 0.17.0.</p>
+
+</div>
+</body>
+</html>

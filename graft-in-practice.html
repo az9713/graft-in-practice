@@ -1,0 +1,877 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Graft in Practice</title>
+<style>
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin:0; background:#0f172a; color:#e2e8f0;
+  font: 16px/1.65 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+.wrap { max-width: 1010px; margin: 0 auto; padding: 42px 22px 90px; }
+h1 { font-size: 2.05rem; line-height:1.2; margin:0 0 10px; letter-spacing:-.02em; }
+h2 { font-size:1.42rem; margin:46px 0 14px; color:#fb923c; letter-spacing:-.01em; }
+h3 { font-size:1.1rem; margin:30px 0 10px; color:#2dd4bf; }
+h4 { font-size:.99rem; margin:24px 0 8px; color:#e2e8f0; }
+p, li { color:#cbd5e1; }
+.lede { font-size:1.09rem; color:#94a3b8; margin:0 0 4px; }
+a { color:#2dd4bf; }
+hr { border:0; border-top:1px solid #334155; margin:46px 0; }
+code { background:#1e293b; border:1px solid #334155; border-radius:4px;
+  padding:1px 5px; font-size:.87em; color:#fb923c;
+  font-family:"Cascadia Mono", Consolas, "SF Mono", Menlo, monospace; }
+pre { background:#111c33; border:1px solid #334155; border-left:3px solid #334155;
+  border-radius:6px; padding:14px 16px; overflow-x:auto; font-size:13px;
+  line-height:1.45; color:#cbd5e1; margin:14px 0;
+  font-family:"Cascadia Mono", Consolas, "SF Mono", Menlo, monospace; }
+pre.diagram { font-size:12.5px; line-height:1.3; border-left-color:#2dd4bf; }
+pre.graft { border-left-color:#fb923c; }
+.card { background:#1e293b; border:1px solid #334155; border-radius:9px;
+  padding:18px 20px; margin:18px 0; }
+.quote { background:#1e293b; border:1px solid #334155; border-left:3px solid #fb923c;
+  border-radius:6px; padding:14px 18px; margin:16px 0; }
+.quote .who { font-size:.72rem; letter-spacing:.09em; text-transform:uppercase;
+  color:#94a3b8; margin-bottom:7px; }
+.quote p { margin:0; color:#e2e8f0; }
+.reply { border-left:3px solid #334155; padding-left:18px; margin:16px 0 0; }
+.verdict { border-radius:8px; padding:15px 18px; margin:22px 0; border:1px solid; }
+.verdict .tag { font-size:.72rem; letter-spacing:.09em; text-transform:uppercase;
+  font-weight:700; display:block; margin-bottom:7px; }
+.no  { background:rgba(251,146,60,.07); border-color:#fb923c; }
+.no .tag { color:#fb923c; }
+.yes { background:rgba(45,212,191,.07); border-color:#2dd4bf; }
+.yes .tag { color:#2dd4bf; }
+.verdict p:last-child { margin-bottom:0; }
+table { border-collapse:collapse; width:100%; margin:16px 0; font-size:.93rem;
+  display:block; overflow-x:auto; }
+th, td { border:1px solid #334155; padding:8px 11px; text-align:left;
+  vertical-align:top; }
+th { background:#1e293b; color:#e2e8f0; font-weight:600; }
+td { color:#cbd5e1; }
+.tabs { display:flex; flex-wrap:wrap; gap:6px; margin:26px 0 0;
+  border-bottom:1px solid #334155; }
+.tabs button { background:#1e293b; color:#94a3b8; border:1px solid #334155;
+  border-bottom:none; border-radius:7px 7px 0 0; padding:9px 15px;
+  font-size:.87rem; cursor:pointer; font-family:inherit; margin-bottom:-1px; }
+.tabs button:hover { color:#e2e8f0; }
+.tabs button.active { background:#0f172a; color:#fb923c;
+  border-bottom:1px solid #0f172a; font-weight:600; }
+.panel { display:none; padding-top:8px; }
+.panel.active { display:block; }
+.pill { display:inline-block; font-size:.71rem; letter-spacing:.06em;
+  text-transform:uppercase; padding:2px 9px; border-radius:20px;
+  border:1px solid #334155; color:#94a3b8; margin:0 6px 0 0; }
+.pill.on { border-color:#2dd4bf; color:#2dd4bf; }
+.pill.off { border-color:#fb923c; color:#fb923c; }
+ul, ol { padding-left:22px; }
+li { margin:5px 0; }
+.foot { color:#94a3b8; font-size:.88rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Graft in practice</h1>
+<p class="lede">Five requests against one real Rust codebase. Three needed no
+code index at all. Two did. This page shows every request and reply as they
+happened, and explains the difference.</p>
+<p class="foot">Session of 8 September 2026 &middot; graft 0.16.0 &middot;
+repository <b>larql_copy</b> &mdash; 1,482 files, 21,581 symbols, 32,435 edges
+&middot; companion to <a href="graft-guide.html">graft-guide.html</a></p>
+
+<h2>What graft is, in plain words</h2>
+<p>Graft reads a repository once and writes down what it found: every function
+and type, where each one is defined, and which ones call which. That record is
+the <b>graph</b>. Afterwards you ask questions of the graph instead of opening
+files.</p>
+<p>The point is not speed. The point is that an answer arrives as a short list of
+exact locations rather than as thousands of lines you then have to read. Here is
+how graft describes itself.</p>
+<pre class="code">Usage: graft [options] [command]
+
+Build a repo&#x27;s context graph as linked markdown, and keep it in sync with the
+code.
+
+Commands:
+  build [options] [dir]             Build graft/ from your code - wiring graph +
+                                    per-file cards ($0, no key).
+  ask [options] &lt;query&gt; [dir]       Query the graft/ graph - returns ranked
+                                    nodes + exact file:line ($0, no key)
+  skeleton [options] &lt;file&gt; [dir]   Signatures-only view of one file from the
+                                    wiring graph - the cheapest way to see a
+                                    file&#x27;s API surface
+  callers [options] &lt;symbol&gt; [dir]  Who calls/references a symbol ($0, no LLM).
+  grep [options] &lt;pattern&gt; [dir]    Regex search over indexed files, hits
+                                    grouped by enclosing symbol and ranked by
+                                    coupling ($0, no LLM)
+  map [options] [dir]               Token-budgeted repo orientation - directory
+                                    clusters, per-directory hubs, and global
+                                    hotspots from the wiring graph ($0, no LLM)</pre>
+<p>Four commands did all the work in this session. None of them uses a language
+model, needs an API key, or touches the network.</p>
+<table>
+<tr><th>Command</th><th>Question it answers</th></tr>
+<tr><td><code>graft callers &lt;symbol&gt;</code></td><td>Who calls or references
+this thing?</td></tr>
+<tr><td><code>graft grep &lt;pattern&gt;</code></td><td>Where does this text
+appear &mdash; and which function is it inside?</td></tr>
+<tr><td><code>graft skeleton &lt;file&gt;</code></td><td>What is this file's API
+surface, without the bodies?</td></tr>
+<tr><td><code>graft map</code></td><td>Where is this repository big and
+busy?</td></tr>
+</table>
+
+<h2>The one rule that decides everything</h2>
+<div class="card">
+<p><b>Graft indexes code. It does not index prose or configuration.</b></p>
+<p>Markdown files, README files and <code>Cargo.toml</code> manifests are
+invisible to the graph. In larql that is 252 markdown files and 17 manifests
+&mdash; and it happens to be where the architecture is written down.</p>
+<p>So the question to ask before reaching for graft is not &ldquo;is this about
+the codebase?&rdquo; It is <b>&ldquo;does the answer live in the code, or in the
+words about the code?&rdquo;</b> Every verdict on this page follows from that one
+distinction.</p>
+</div>
+
+<h2>The five exchanges</h2>
+<p>Each tab holds one request word for word, a verdict on whether graft was used
+and why, and the reply as it was given.</p>
+
+<div class="tabs" data-group="ex">
+  <button class="active"><span class="pill off">no graft</span>1 &middot; ASCII architecture diagram</button>
+  <button><span class="pill off">no graft</span>2 &middot; Did you use graft?</button>
+  <button><span class="pill on">graft</span>3 &middot; Callers of KvDispatch</button>
+  <button><span class="pill off">no graft</span>4 &middot; How was graft used?</button>
+  <button><span class="pill on">graft</span>5 &middot; Build this page</button>
+</div>
+<div id="ex">
+  <div class="panel active">
+<div class="quote"><div class="who">User request 1</div>
+<p>can you create an ascii diagram showing the architecture of larql</p></div>
+
+<div class="verdict no"><span class="tag">Graft not used</span>
+<p>The answer lived in prose and in config files. Graft indexes neither.</p></div>
+
+<h4>Why not</h4>
+<p>Three pieces of information were needed. Graft could supply none of them.</p>
+<ol>
+<li><b>What each crate is for.</b> This is written in
+<code>larql/docs/onboarding/architecture.md</code> &mdash; a markdown file.
+Graft builds its graph from code. It parses functions, types and call sites. It
+does not read prose. The larql repository holds 252 markdown files and every one
+of them is invisible to the graph.</li>
+<li><b>Which crate depends on which.</b> This is declared in the 17
+<code>Cargo.toml</code> manifests. A manifest is configuration, not code.
+Graft has no edge type that means &ldquo;crate A lists crate B in its
+dependencies&rdquo;.</li>
+<li><b>What a vindex looks like on disk.</b> Another markdown file.</li>
+</ol>
+
+<h4>The command that did work</h4>
+<p>A plain shell loop over the manifests gave the exact dependency edges. It also
+caught two mistakes in the project's own architecture document.</p>
+<pre class="code">$ for c in crates/*/; do
+    printf &quot;== %s : &quot; &quot;$(basename $c)&quot;
+    grep -oE &#x27;^(larql-[a-z-]+|model-compute)&#x27; $c/Cargo.toml | sort -u | tr &#x27;\n&#x27; &#x27; &#x27;
+    echo
+  done
+
+== larql-boundary :
+== larql-cli : larql-compute larql-compute-metal larql-core larql-inference larql-kv larql-lql larql-models larql-vindex
+== larql-compute-metal : larql-compute larql-models
+== larql-compute : larql-models
+== larql-core :
+== larql-inference : larql-compute larql-compute-metal larql-core larql-kv larql-models larql-router-protocol larql-vindex
+== larql-kv : larql-boundary larql-compute larql-compute-metal larql-inference larql-vindex
+== larql-lql : larql-compute larql-compute-metal larql-core larql-inference larql-models larql-vindex
+== larql-models :
+== larql-python : larql-core larql-inference larql-kv larql-lql larql-models larql-vindex
+== larql-router-protocol :
+== larql-router : larql-router-protocol
+== larql-server : larql-compute larql-compute-metal larql-inference larql-models larql-router larql-router-protocol larql-vindex
+== larql-vindex-spec :
+== larql-vindex : larql-compute larql-compute-metal larql-core larql-inference larql-models larql-vindex-spec
+== model-compute :</pre>
+<p>The manifests also hide a trap. Two pairs of crates appear to depend on each
+other, which Cargo forbids. Splitting the file by section shows why: the reverse
+edges are test-only.</p>
+<pre class="code">$ awk &#x27;/^\[/{sec=$0} /^(larql-|model-compute)/{print sec&quot;  -&gt;  &quot;$1}&#x27; \
+      crates/larql-kv/Cargo.toml
+
+[dependencies]  -&gt;  larql-inference
+[dependencies]  -&gt;  larql-compute
+[dependencies]  -&gt;  larql-compute-metal
+[dependencies]  -&gt;  larql-vindex
+[dependencies]  -&gt;  larql-boundary
+
+$ ... crates/larql-inference/Cargo.toml
+
+[dependencies]      -&gt;  larql-models
+[dependencies]      -&gt;  larql-compute
+[dependencies]      -&gt;  larql-core
+[dependencies]      -&gt;  larql-vindex
+[dependencies]      -&gt;  larql-router-protocol
+[dev-dependencies]  -&gt;  larql-kv      &lt;-- test-only, not a build edge</pre>
+
+<h4>But could <span class="nc">graft map</span> have helped?</h4>
+<p>This is worth answering honestly, because it is the closest graft gets to an
+architecture command. I ran it while writing this page.</p>
+<pre class="graft">$ graft map
+
+[graft] tokens saved ~ 4,301,987 (100%) - this output ~ 546 tok vs reading the
+1482 file(s) it covers whole ~ 4,302,533 tok (estimate).
+
+repo map - 1482 files . 21581 symbols . 32435 edges . python
+
+larql/crates/     1379 files . 20951 symbols  hubs: vec (refine.rs, 2614&lt;-), format (templates.rs, 1462&lt;-), push (detok.rs, 880&lt;-)
+larql/knowledge/    58 files .   391 symbols  hubs: make_label (labels.py, 15&lt;-), _add (ast_extract.py, 14&lt;-)
+the-mechanism/      20 files .   107 symbols  hubs: logits (native.py, 3&lt;-), xy (v1_spot_in_space.py, 3&lt;-)
+larql/tests/         1 files .    52 symbols
+larql/scripts/       7 files .    37 symbols
+larql/examples/      9 files .    16 symbols
+larql/flake.nix      1 files .    13 symbols
+larql/nix/           6 files .    13 symbols
+larql/bench/         1 files .     1 symbols
+
+hotspots:
+  vec     . larql/crates/larql-vindex/src/patch/refine.rs:L186-L188          . 2614&lt;-
+  format  . larql/crates/larql-core/src/engine/templates.rs:L18-L20          . 1462&lt;-
+  push    . larql/crates/larql-inference/src/layer_graph/generate/detok.rs   .  880&lt;-
+  path    . larql/crates/larql-python/src/session.rs:L95-L97                 .  480&lt;-
+  as_ref  . larql/crates/larql-vindex/src/index/.../mmap_storage.rs:L408     .  434&lt;-</pre>
+<p>It does not help, for two reasons.</p>
+<ul>
+<li><b>It clusters by directory, not by crate.</b> All 17 crates collapse into a
+single line: <code>larql/crates/  1379 files</code>. The crate boundary is
+the thing the diagram is about, and the map erases it.</li>
+<li><b>Its &ldquo;hubs&rdquo; are ordinary method names.</b> The top five are
+<code>vec</code>, <code>format</code>, <code>push</code>, <code>path</code>
+and <code>as_ref</code>. These are everyday Rust methods that appear
+everywhere. With 2,614 incoming edges, <code>vec</code> is the most connected
+symbol in the repository and tells you nothing about the design.</li>
+</ul>
+<p>So the map is good for &ldquo;where is this repository big and busy&rdquo;. It
+is not an architecture tool.</p>
+
+<hr>
+<h3>The reply, verbatim</h3>
+<div class="reply">
+<p>Diagram below. I read <code>docs/onboarding/architecture.md</code> and <code>docs/onboarding/vindex-and-lql.md</code>, then checked every arrow against
+<code>crates/*/Cargo.toml</code>.</p>
+<pre class="diagram">larql -- crate architecture.  Arrow = &quot;depends on&quot; (upper crate uses lower).
+
+  ENTRY POINTS
+  +--------------+  +---------------+  +------------------------+
+  | larql-cli    |  | larql-python  |  | larql-server           |
+  | `larql` bin  |  | PyO3 _native: |  | HTTP + gRPC; serves    |
+  |              |  | WalkModel,    |  | vindexes and MoE       |
+  |              |  | TRACE, hooks  |  | expert shards          |
+  +------+-------+  +-------+-------+  +-----------+------------+
+         |                  |                      |
+         +--------+---------+                      +--&gt; see
+                  v                                     DISTRIBUTION
+  QUERY LANGUAGE                                        strip below
+  +---------------------------+
+  | larql-lql                 |
+  | lexer, parser, executor,  |
+  | REPL, USE REMOTE client   |
+  +------------+--------------+
+               |
+  STATE        v
+  +---------------------------+      +----------------------+
+  | larql-kv                  |-----&gt;| larql-boundary       |
+  | 9 KV-cache engines;       |      | confidence-gated     |
+  | (canonical, derivative,   |      | boundary residual    |
+  |  contract) state policy   |      | codec, tiered ctx    |
+  +------------+--------------+      +----------------------+
+               |
+  ENGINE       v
+  +---------------------------------------------------+
+  | larql-inference                                   |
+  | forward pass, WalkFfn sparse FFN, mech-interp     |
+  | hooks (lens, patching), KV orchestration, routing |
+  +------------------------+--------------------------+
+                           |
+  DATA                     v
+  +---------------------------+      +----------------------+
+  | larql-vindex              |-----&gt;| larql-vindex-spec    |
+  | extract, load, KNN query, |      | v1 manifest schema,  |
+  | mutate, patch overlay,    |      | shard rule, limits   |
+  | clustering, compile       |      +----------------------+
+  +------------+--------------+
+               |
+               +-------------------------+
+  SUBSTRATE    v                         v
+  +---------------------------+  +--------------------------+
+  | larql-compute             |  | larql-core               |
+  | CPU forward-pass math,    |  | graph algorithms: merge, |
+  | BLAS + NEON Q4_K,         |  | diff, BFS, pagerank      |
+  | KvDispatch (ADR-0022)     |  +--------------------------+
+  +------------+--------------+
+               |         +---------------------------+
+               |         | larql-compute-metal       |
+               |         | Metal GPU peer, Apple Si; |
+               |         | uses compute + models     |
+               |         +------------+--------------+
+               v                      v
+  +--------------------------------------------+
+  | larql-models                               |
+  | config, architecture traits, weight load,  |
+  | quant/dequant; detects 12+ model families  |
+  +--------------------------------------------+
+
+  DISTRIBUTION strip -- for models too large for one machine
+  larql-server --&gt; +------------------+     +------------------+
+                   | larql-router     |----&gt;| larql-router-    |
+                   | shard by layer,  |     | protocol         |
+                   | shard by expert  |     | gRPC protobufs   |
+                   +------------------+     +------------------+
+                                                     ^
+  larql-inference and larql-server also use ---------+
+  larql-router-protocol directly.
+
+  PORTABLE -- these never import larql-*  (the one-way rule)
+  +---------------------------+  +--------------------------+
+  | model-compute             |  | larql-experts            |
+  | bounded native kernels,   |  | sandboxed WASM compute   |
+  | optional wasmtime         |  | primitives, JSON ABI     |
+  +---------------------------+  +--------------------------+</pre>
+<p>What the crates read and write on disk:</p>
+<pre class="diagram">  ON DISK -- what the crates read and write
+
+  +--------------------------------------------------+
+  | gemma3-4b.vindex/     READ-ONLY, mmap-first, f16 |
+  |   gate_vectors.bin    W_gate rows -&gt; KNN index   |
+  |   embeddings.bin      token &lt;-&gt; vector lookup    |
+  |   down_meta.bin       per-feature output meta    |
+  |   index.json          config, layer bands        |
+  |   tokenizer.json      relation_clusters.json     |
+  |   feature_labels.json                            |
+  +-----------------------+--------------------------+
+                          |  INSERT / DELETE / UPDATE
+                          v
+              +---------------------------+
+              | PatchedVindex overlay     |  SAVE PATCH -&gt; x.vlp
+              | base files never change   |
+              +-------------+-------------+
+                            |  COMPILE
+                            v
+              +----------------------------------+
+              | new standalone .vindex           |
+              | hardlinks base weights, rewrites |
+              | only changed down_weights cols   |
+              +----------------------------------+</pre>
+<p>Four notes, then one offer:</p>
+<ol>
+<li><b>The doc chain is wrong in two places.</b>
+<code>docs/onboarding/architecture.md</code> puts <code>larql-vindex</code> above <code>larql-inference</code>, and <code>larql-inference</code> above <code>larql-kv</code>. The real build edges run the other way:
+<code>larql-inference</code> depends on <code>larql-vindex</code>, and
+<code>larql-kv</code> depends on <code>larql-inference</code>. The
+reverse edges exist, but only as <code>[dev-dependencies]</code>. My diagram
+uses the build edges.</li>
+<li><b>The diagram draws the shortest path only.</b> Most crates also depend
+directly on lower tiers. Example: <code>larql-cli</code> depends on 8 crates
+&mdash; compute, compute-metal, core, inference, kv, lql, models, vindex.</li>
+<li><b>Crate count.</b> The Cargo workspace has 16 members.
+<code>larql-experts</code> is a 17th crate directory with its own
+<code>Cargo.lock</code> and its own workspace. No workspace crate imports
+<code>model-compute</code> or <code>larql-experts</code> today.</li>
+<li><b>Not drawn:</b> the three data flows (DESCRIBE, INFER,
+INSERT&rarr;COMPILE). Say the word and I will draw them as a second
+diagram.</li>
+</ol>
+</div>
+</div>
+  <div class="panel">
+<div class="quote"><div class="who">User request 2</div>
+<p>did you use graft for this response</p></div>
+
+<div class="verdict no"><span class="tag">Graft not used</span>
+<p>A question about what the agent just did is answered from the transcript, not
+from the code.</p></div>
+
+<h4>Why not</h4>
+<p>Nothing here is a code question. The user asked what tools ran in the previous
+turn. That record sits in the conversation. Reaching for a code index to answer
+it would be theatre.</p>
+<p>The turn is still worth keeping, because it is the moment the honest limit got
+stated out loud, before any graft command had run.</p>
+
+<hr>
+<h3>The reply, verbatim</h3>
+<div class="reply">
+<p>No. I used no Graft tool in that response.</p>
+<p>What I actually ran, all through Bash:</p>
+<ol>
+<li><code>ls</code> and <code>find</code> &mdash; to locate
+<code>larql_copy/</code> and list <code>crates/</code>.</li>
+<li><code>cat</code> &mdash; <code>README.md</code>, <code>HANDOFF.md</code>, <code>docs/index.md</code>, <code>docs/onboarding/architecture.md</code>, <code>docs/onboarding/vindex-and-lql.md</code>.</li>
+<li><code>grep</code> and <code>awk</code> over <code>crates/*/Cargo.toml</code> &mdash; to read the real dependency edges and split
+<code>[dependencies]</code> from <code>[dev-dependencies]</code>.</li>
+<li><code>awk</code> on my draft &mdash; to measure the maximum line width
+and confirm pure ASCII.</li>
+</ol>
+<p>There is no token-savings line to report, because no Graft tool ran.</p>
+<p>Two reasons Graft did not fit this task:</p>
+<ul>
+<li><b>The architecture lives in prose.</b> Four of the five files I read are
+markdown. Graft indexes code, not prose, so those 5 files are invisible to it.
+That limit is already in memory and in <code>HANDOFF.md</code>.</li>
+<li><b>The arrow check needed <code>Cargo.toml</code>, not symbols.</b> Graft
+maps symbols and call edges. Crate-to-crate dependency edges are declarations in
+a TOML file. <code>grep</code> reads them directly and exactly.</li>
+</ul>
+<p>Graft would help on a different question about this same repo &mdash; for
+example &ldquo;who calls <code>WalkFfn</code>&rdquo; or &ldquo;what breaks if
+I change <code>KvDispatch</code>&rdquo;. <code>larql_copy/</code> is
+already indexed (23,063 symbols, 32,435 edges). Ask a question of that shape and
+I will use it.</p>
+</div>
+</div>
+  <div class="panel">
+<div class="quote"><div class="who">User request 3</div>
+<p>list all the callers of KvDispatch</p></div>
+
+<div class="verdict yes"><span class="tag">Graft used &mdash; 23 calls, 0 source
+files opened</span>
+<p>The question names a symbol and asks for its edges. That is exactly what the
+index holds.</p></div>
+
+<h4>Why graft fitted</h4>
+<p>Compare the two questions. &ldquo;What is the architecture&rdquo; is a
+question about intent, and intent is written in prose. &ldquo;Who calls
+<code>KvDispatch</code>&rdquo; is a question about edges between symbols, and
+edges are what the graph stores. Nothing else changed. The repository is the
+same. Only the shape of the question moved.</p>
+<p>I made 23 graft calls and opened no source file at all.</p>
+
+<h4>Step 1 &mdash; the useful failure</h4>
+<p>The first command failed, and the failure did more work than any success.</p>
+<pre class="graft">$ graft callers KvDispatch
+
+[graft] tokens saved ~ 10,383 (99%) - this output ~ 84 tok vs reading the
+1 file(s) it covers whole ~ 10,467 tok (estimate).
+
+KvDispatch . interface . larql/crates/larql-compute/src/kv_dispatch/mod.rs:L200-L571
+  no indexed callers - the graph has no incoming call/reference edges for this
+  symbol as written. Check the name (try the bare symbol, or &quot;Type.method&quot;), or
+  find its uses with graft grep &quot;KvDispatch&quot;. Fall back to raw grep -rn only for
+  unindexed files</pre>
+<p>Two facts arrived in four lines. Graft classified the symbol as an
+<b>interface</b> &mdash; a Rust trait &mdash; and reported no incoming call
+edges. That is correct, not broken. A trait is a contract. Nothing calls a
+contract. Code implements it, or requires it, or calls one of its methods.</p>
+<p>So the answer had to be split three ways: who implements it, who requires it,
+and who calls its methods. Graft also named its own next command,
+<code>graft grep &quot;KvDispatch&quot;</code>.</p>
+
+<h4>Step 2 &mdash; search that knows what a function is</h4>
+<pre class="graft">$ graft grep &quot;KvDispatch&quot;
+
+[graft] tokens saved ~ 175,047 (98%) - this output ~ 2,975 tok vs reading the
+30 file(s) it covers whole ~ 178,022 tok (estimate).
+
+&quot;KvDispatch&quot; - 102 hits in 49 symbols across 30 files (searched 1482 indexed files)
+
+prefill_quant . function . larql/crates/larql-kv/src/engines/markov_residual/engine.rs:L161-L189 . 17 in-edges
+  L172: // W1-GPU path: route through KvDispatch&#x27;s coarse_prefill_with_state
+
+close_window . function . larql/crates/larql-kv/src/engines/unlimited_context/engine.rs:L346-L422 . 5 in-edges
+  L349: // (Metal kv cache) via KvDispatch::read_kv_row_at. Without
+
+cpu_handle_mut . function . larql/crates/larql-compute/src/kv_dispatch/cpu.rs:L130-L141 . 3 in-edges
+  L137: &quot;CpuBackend::KvDispatch received a foreign handle (backend={name}); \
+
+attention_step_async . function . larql/crates/larql-compute/src/async_compute_backend/cpu.rs:L55-L75 . 2 in-edges
+  L64: let hidden = &lt;Self as KvDispatch&gt;::attention_step(
+
+AsyncComputeBackend . interface . larql/crates/larql-compute/src/async_compute_backend/mod.rs:L258-L387
+  L258: pub trait AsyncComputeBackend: crate::ComputeBackend + KvDispatch + Send {
+
+  ... 44 more symbols ...</pre>
+<p>This is the difference from plain <code>grep</code>. A plain grep returns
+a line. Graft returns the line, the function that contains it, that function's
+line range, and how many other places call that function. The
+<code>17 in-edges</code> on <code>prefill_quant</code> says at a glance
+that this is a well-connected function, not a dead corner.</p>
+<p>A narrower pattern found the implementors directly.</p>
+<pre class="graft">$ graft grep &quot;impl KvDispatch for&quot;
+
+[graft] tokens saved ~ 34,519 (99%) - this output ~ 194 tok vs reading the
+4 file(s) it covers whole ~ 34,713 tok (estimate).
+
+&quot;impl KvDispatch for&quot; - 5 hits in 5 symbols across 4 files (searched 1482 indexed files)
+
+larql/crates/larql-compute-metal/src/kv_dispatch_impl.rs (module level)
+  L31: impl KvDispatch for MetalBackend {
+
+tests . module . larql/crates/larql-compute/src/async_compute_backend/mod.rs:L390-L702
+  L445: impl KvDispatch for StubAsyncBackend {}
+
+larql/crates/larql-compute/src/kv_dispatch/cpu.rs (module level)
+  L243: impl KvDispatch for CpuBackend {
+
+tests . module . larql/crates/larql-compute/src/kv_dispatch/mod.rs:L614-L1017
+  L638: impl KvDispatch for StubKvBackend {}</pre>
+
+<h4>Step 3 &mdash; a file's shape without its contents</h4>
+<p><code>helpers.rs</code> is 597 lines. I needed the six function names in
+it, not the bodies.</p>
+<pre class="graft">$ graft skeleton larql/crates/larql-inference/src/kv_dispatch/helpers.rs
+
+graft skeleton - larql/crates/larql-inference/src/kv_dispatch/helpers.rs
+- L39-L51    function ffn_or_moe_layer                     fn ffn_or_moe_layer(
+- L62-L75    function kv_prefill_via_dispatch              pub fn kv_prefill_via_dispatch(
+- L88-L122   function kv_prefill_from_hidden_via_dispatch  pub fn kv_prefill_from_hidden_via_dispatch(
+- L135-L172  function kv_decode_step_via_dispatch          pub fn kv_decode_step_via_dispatch(
+- L192-L205  function kv_prefill_via_dispatch_async        pub fn kv_prefill_via_dispatch_async(
+- L215-L251  function kv_prefill_from_hidden_via_dispatch_async
+- L259-L296  function kv_decode_step_via_dispatch_async    pub fn kv_decode_step_via_dispatch_async(
+- L298-L304  function last_row_as_2d                       fn last_row_as_2d(h: &amp;Array2&lt;f32&gt;) -&gt; Array2&lt;f32&gt;
+- L307-L597  module   tests                                mod tests
+  ... 11 test functions ...</pre>
+
+<h4>Step 4 &mdash; the real call graph</h4>
+<p>Now with concrete function names, <code>graft callers</code> works as
+advertised. This produced the tables in the answer.</p>
+<pre class="graft">$ graft callers kv_prefill_via_dispatch
+
+kv_prefill_via_dispatch . function . larql/crates/larql-inference/src/kv_dispatch/helpers.rs:L62-L75
+  calls &lt;- do_prefill (larql/crates/larql-kv/src/engines/standard.rs:L114-L148)
+      122: BackendSlot::Sync(b) =&gt; kv_prefill_via_dispatch(
+  calls &lt;- bench_helpers_sync_vs_async (larql/crates/larql-kv/benches/engine_decode.rs:L170-L227)
+      172: kv_decode_step_via_dispatch, kv_decode_step_via_dispatch_async, kv_prefill_via_dispatch,
+  calls &lt;- prefill_empty_prompt_returns_none (larql/.../kv_dispatch/helpers.rs:L358-L364)
+      362: let result = kv_prefill_via_dispatch(&amp;backend, &amp;weights, &amp;ffn, &amp;[], None, None);
+  calls &lt;- prefill_async_matches_sync_dispatch (larql/.../kv_dispatch/helpers.rs:L369-L388)
+      376: kv_prefill_via_dispatch(&amp;backend, &amp;weights, &amp;ffn, &amp;prompt, None, None).unwrap();
+  ... 5 more test callers ...
+
+
+$ graft callers kv_decode_step_via_dispatch
+
+kv_decode_step_via_dispatch . function . larql/.../kv_dispatch/helpers.rs:L135-L172
+  calls &lt;- do_decode_step (larql/crates/larql-kv/src/engines/standard.rs:L193-L236)
+      207: BackendSlot::Sync(b) =&gt; kv_decode_step_via_dispatch(
+  calls &lt;- decode_step_via_dispatch_matches_legacy_kv_decode_step_run
+           (larql/crates/larql-kv/tests/dispatch_parity.rs:L76-L116)
+       90: let h_trait = kv_decode_step_via_dispatch(
+  ... 5 more callers ...</pre>
+<p>Each result gives the calling function, its file, its line range, and the
+exact call line. That chain &mdash; <code>larql-kv</code> &rarr; <code>larql-inference</code> &rarr; <code>larql-compute</code> &mdash; came
+entirely from commands of this shape.</p>
+
+<h4>What failed, and the lesson</h4>
+<pre class="graft">$ graft grep &quot;+ KvDispatch&quot;
+  x invalid pattern &quot;+ KvDispatch&quot;: Invalid regular expression: /+ KvDispatch/:
+    Nothing to repeat
+
+$ graft grep &quot;: KvDispatch&quot;
+  no hits for &quot;: KvDispatch&quot; in 1482 indexed files. The pattern may be too
+  specific - retry graft grep with a bare symbol name or short substring.
+
+$ graft grep &quot;\.coarse_prefill_with_state(&quot;
+  (no output at all)
+
+$ graft callers coarse_prefill_with_state
+  coarse_prefill_with_state . function . larql/crates/larql-compute/src/kv_dispatch/cpu.rs:L407-L428
+    calls &lt;- coarse_prefill (larql/crates/larql-compute/src/kv_dispatch/cpu.rs:L398-L405)
+        404: self.coarse_prefill_with_state(weights, token_ids, index, None)</pre>
+<p><b>The lesson:</b> for call edges, pass a bare symbol name to
+<code>graft callers</code>. Do not write a regex for
+<code>graft grep</code>. The regex form returned nothing on exactly the names
+the symbol form resolved. <code>graft grep</code> takes a regular expression,
+so a leading <code>+</code> is a syntax error, not a search.</p>
+<p>Graft also reported a limit on itself, unprompted:</p>
+<pre class="graft">$ graft callers read_kv_row_at
+
+read_kv_row_at . function . larql/crates/larql-compute-metal/src/kv_dispatch_impl.rs:L397-L425
+  no indexed callers - the graph has no incoming call/reference edges for this
+  symbol as written. 2 definitions share the name &quot;read_kv_row_at&quot;; a cross-file
+  caller of an ambiguous name is dropped rather than guessed, so this may
+  undercount.</pre>
+<p>Two functions share the name. Rather than guess which one a caller meant,
+graft drops the ambiguous edge and says so. That warning went straight into the
+answer instead of being hidden.</p>
+
+<hr>
+<h3>The reply, verbatim</h3>
+<div class="reply">
+<p><code>KvDispatch</code> is a trait, not a function.
+<code>graft callers KvDispatch</code> returned <b>no indexed callers</b>
+&mdash; a trait has no incoming call edges. So I split &ldquo;callers&rdquo; into
+the three things you probably mean. Definition:
+<code>larql/crates/larql-compute/src/kv_dispatch/mod.rs:200-571</code>.</p>
+
+<h4>1. Implementors &mdash; types that supply the behaviour</h4>
+<table><tr><th>Type</th><th>File:line</th></tr>
+<tr><td><code>CpuBackend</code></td><td><code>larql/crates/larql-compute/src/kv_dispatch/cpu.rs:243</code></td></tr>
+<tr><td><code>MetalBackend</code></td><td><code>larql/crates/larql-compute-metal/src/kv_dispatch_impl.rs:31</code></td></tr>
+<tr><td><code>StubKvBackend</code> <i>(test)</i></td><td><code>larql/crates/larql-compute/src/kv_dispatch/mod.rs:638</code></td></tr>
+<tr><td><code>StubAsyncBackend</code> <i>(test)</i></td><td><code>larql/crates/larql-compute/src/async_compute_backend/mod.rs:445</code></td></tr>
+</table>
+
+<h4>2. Traits that require it as a supertrait</h4>
+<table><tr><th>Trait</th><th>File:line</th></tr>
+<tr><td><code>EngineBackend: ComputeBackend + KvDispatch</code></td><td><code>larql-compute/src/kv_dispatch/mod.rs:594</code></td></tr>
+<tr><td>blanket <code>impl&lt;T: ComputeBackend + KvDispatch&gt; EngineBackend for T</code></td><td><code>larql-compute/src/kv_dispatch/mod.rs:607</code></td></tr>
+<tr><td><code>AsyncComputeBackend: ComputeBackend + KvDispatch + Send</code></td><td><code>larql-compute/src/async_compute_backend/mod.rs:258</code></td></tr>
+</table>
+<p>Any type meeting both bounds becomes an <code>EngineBackend</code>
+automatically. That blanket impl is how the KV engines reach the trait without
+naming it.</p>
+
+<h4>3. Direct call sites of a <code>KvDispatch</code> method</h4>
+<p><b><code>larql-compute/src/async_compute_backend/cpu.rs</code></b>
+&mdash; the async wrappers delegate to the sync trait:</p>
+<ul>
+<li><code>attention_step_async:64</code> &rarr; <code>&lt;Self as KvDispatch&gt;::attention_step</code></li>
+<li><code>attention_prefill_async:85</code> &rarr; <code>attention_prefill</code></li>
+<li><code>upload_boundary_residual_async:101</code> &rarr; <code>upload_boundary_residual</code></li>
+<li><code>forward_from_layer_async:119</code> &rarr; <code>forward_from_layer</code></li>
+<li><code>attention_step_async_matches_sync:187</code> <i>(test)</i></li>
+</ul>
+<p><b>Self-calls inside implementors:</b></p>
+<ul>
+<li><code>larql-compute/src/kv_dispatch/cpu.rs:404</code> &mdash;
+<code>coarse_prefill</code> &rarr; <code>coarse_prefill_with_state</code></li>
+<li><code>larql-compute-metal/src/kv_dispatch_impl.rs:305</code> &mdash;
+<code>coarse_decode_step_with_state</code> &rarr; <code>..._masked</code></li>
+</ul>
+
+<h4>4. The real consumer path &mdash; inference helpers, then the KV engines</h4>
+<p><code>larql-inference/src/kv_dispatch/helpers.rs</code> wraps the trait in
+six public functions. Everything above <code>larql-compute</code> calls
+these, not the trait:</p>
+<p><code>kv_prefill_via_dispatch:62</code> &middot; <code>kv_prefill_from_hidden_via_dispatch:88</code> &middot; <code>kv_decode_step_via_dispatch:135</code> &middot; <code>kv_prefill_via_dispatch_async:192</code> &middot; <code>kv_prefill_from_hidden_via_dispatch_async:215</code> &middot; <code>kv_decode_step_via_dispatch_async:259</code></p>
+<p>Non-test callers of those helpers:</p>
+<table><tr><th>Caller</th><th>File:line</th></tr>
+<tr><td><code>do_prefill</code> (sync / async arms)</td><td><code>larql-kv/src/engines/standard.rs:122</code> and <code>:133</code></td></tr>
+<tr><td><code>do_prefill_from_hidden</code></td><td><code>larql-kv/src/engines/standard.rs:163</code></td></tr>
+<tr><td><code>do_decode_step</code> (sync / async arms)</td><td><code>larql-kv/src/engines/standard.rs:207</code> and <code>:220</code></td></tr>
+<tr><td><code>bench_helpers_sync_vs_async</code></td><td><code>larql-kv/benches/engine_decode.rs:172</code></td></tr>
+<tr><td><code>decode_step_via_dispatch_matches_legacy_kv_decode_step_run</code> <i>(test)</i></td><td><code>larql-kv/tests/dispatch_parity.rs:90</code></td></tr>
+<tr><td><code>multi_step_decode_via_dispatch_matches_legacy</code> <i>(test)</i></td><td><code>larql-kv/tests/dispatch_parity.rs:133</code></td></tr>
+</table>
+<p>Two more engines carry their own dispatch modules that route to the trait:</p>
+<ul>
+<li><code>larql-kv/src/engines/markov_residual/dispatch.rs</code> &mdash;
+<code>try_prefill_via_dispatch:31</code>, <code>decode_step_via_dispatch:134</code></li>
+<li><code>larql-kv/src/engines/unlimited_context/dispatch.rs</code> &mdash;
+<code>try_prefill_via_dispatch:29</code>, <code>decode_step_via_dispatch:93</code></li>
+</ul>
+
+<h4>Three limits on this list</h4>
+<ol>
+<li><b><code>read_kv_row_at</code> may be undercounted.</b> Graft reports two
+definitions share that name &mdash;
+<code>larql-compute/src/kv_dispatch/mod.rs:532</code> and
+<code>larql-compute-metal/src/kv_dispatch_impl.rs:397</code>. Graft drops
+ambiguous cross-file callers instead of guessing.
+<code>unlimited_context/engine.rs:349</code> names the method in a
+comment.</li>
+<li><b>Most text hits are comments.</b> <code>graft grep &quot;KvDispatch&quot;</code>
+found 102 hits in 30 files. The majority are doc comments and re-export lines
+&mdash; for example <code>larql-inference/src/kv_dispatch/mod.rs:1</code> and
+<code>cpu.rs:1</code> are stubs that say the code moved to
+<code>larql_compute</code>, and <code>larql-inference/src/lib.rs:190</code>
+only re-exports the name. I excluded those from the tables above.</li>
+<li><b>I did not expand every method call inside the two engine dispatch
+modules.</b> I named the module and its two entry functions. Ask and I will list
+each <code>KvDispatch</code> method they touch.</li>
+</ol>
+<p class="foot">&#127793; graft saved ~398,381 tokens this turn. That is the sum
+of the four savings lines I kept on screen; several later calls had their savings
+line filtered out of my view, so the true total is higher.</p>
+</div>
+</div>
+  <div class="panel">
+<div class="quote"><div class="who">User request 4</div>
+<p>explain how graft was used in this turn</p></div>
+
+<div class="verdict no"><span class="tag">Graft not used</span>
+<p>Another question about the transcript, not about the code.</p></div>
+
+<h4>Why not</h4>
+<p>The material was the previous turn's own tool log. Running graft again would
+have added cost and no information. It would also have been circular &mdash;
+using the tool to describe the tool.</p>
+<p>This turn produced the correction that matters most for honest accounting.
+The token figure reported in request 3 was inflated, because the same
+<code>graft grep &quot;KvDispatch&quot;</code> ran twice and both savings banners got
+added together. The second run was waste, not saving.</p>
+
+<hr>
+<h3>The reply, verbatim (condensed to its findings)</h3>
+<div class="reply">
+<p>I made 23 <code>graft</code> calls this turn, and opened zero
+<code>.rs</code> files.</p>
+<ul>
+<li><b><code>graft callers KvDispatch</code> &mdash; 1 call.</b> This failed,
+and the failure was the most useful result of the turn. Graft classified the
+symbol as an <i>interface</i> and told me the graph holds no incoming call edges.
+That is what made me split the answer into implementors, supertrait bounds, and
+call sites.</li>
+<li><b><code>graft grep &quot;KvDispatch&quot;</code> &mdash; 2 calls.</b> 102 hits, 49
+symbols, 30 files. Each hit came back with the enclosing symbol name, its line
+range, and its in-edge count. I ran this twice. That was my waste. The first run
+I piped to <code>head -60</code> and lost the tail; the second I saved to a
+file. I should have saved it the first time.</li>
+<li><b><code>graft grep</code> with narrower patterns &mdash; 6 calls.</b>
+<code>&quot;impl KvDispatch for&quot;</code> found the 4 implementors.
+<code>&quot;as KvDispatch&gt;::&quot;</code> found the 5 qualified call sites.</li>
+<li><b><code>graft skeleton</code> &mdash; 3 calls.</b> Lists every function
+with its signature and line range, and omits the bodies. That is how I got the
+six helper names without reading a 597-line file.</li>
+<li><b><code>graft callers</code> on concrete functions &mdash; 8 calls.</b>
+This produced the tables.</li>
+</ul>
+<p><b>What failed, and the lesson.</b> Four calls returned nothing useful.
+<code>graft grep &quot;+ KvDispatch&quot;</code> was a hard error:
+<code>Invalid regular expression: /+ KvDispatch/: Nothing to repeat</code>.
+<code>graft grep &quot;: KvDispatch&quot;</code> returned zero hits although such
+bounds exist in the code. <code>graft grep &quot;\.coarse_prefill_with_state(&quot;</code>
+and two siblings returned zero hits &mdash; but
+<code>graft callers coarse_prefill_with_state</code> found the call at
+<code>cpu.rs:404</code>. For call edges, pass a bare symbol name to
+<code>graft callers</code>. Do not write a regex for
+<code>graft grep</code>.</p>
+<p><b>What I did without graft.</b> Only shell plumbing on graft's own output
+&mdash; <code>head</code>, <code>sed</code>, <code>grep -v</code> to strip
+the banner, and <code>awk</code> / <code>uniq -c</code> to group the 102 hits
+by file. No source file was opened.</p>
+<p><b>Cost.</b> The four savings banners I kept on screen summed to ~398,381
+tokens. Subtract the duplicate grep and the real figure is nearer ~223,000 saved,
+plus the calls whose banner I filtered out of view.</p>
+</div>
+</div>
+  <div class="panel">
+<div class="quote"><div class="who">User request 5</div>
+<p>Ok look back to my previous requests. Most did not use graft. the last one or
+two used graft. Capture all these requests and responses verbatim. Explain why
+graft was not used. Explain why graft was used and how. the ultimate goal is to
+demystify what graft is and how it works and to serve a few useful examples on a
+real codebase. output to a html. you may want different tabs for different
+exampels. Write in simple, plan English prose.</p></div>
+
+<div class="verdict yes"><span class="tag">Graft used once &mdash; graft map</span>
+<p>Not to write the page, but to test a claim the page makes.</p></div>
+
+<h4>Why one call, and only one</h4>
+<p>The material for this page is the conversation itself. No code question was
+asked, so no code index was needed.</p>
+<p>One command was worth running. Request 1's verdict says graft could not have
+drawn the architecture diagram. That claim deserved a test rather than an
+assertion, so I ran <code>graft map</code> &mdash; the one graft command
+aimed at repository orientation. The output is in tab 1. It confirmed the
+verdict and sharpened it: the map clusters by directory rather than by crate, and
+its top hubs are ordinary Rust method names.</p>
+<p>That single call reported 4,301,987 tokens saved against reading all 1,482
+files. The number is real but misleading, and it is worth saying why. Nobody
+would ever read 1,482 files to answer one question. The banner compares against
+the worst possible alternative, not against what a careful person would actually
+do.</p>
+
+<h4>The reply</h4>
+<p>This page is the reply. There is no separate prose answer to quote.</p>
+<p>One more command was run while writing, and it returned nothing:</p>
+<pre class="graft">$ graft stats
+graft stats: no session recorded yet - use graft in an agent session, then look again.</pre>
+<p><code>graft stats</code> is meant to report the graft-versus-source mix
+for an agent session. It found no session. The likely reason is that no
+repository is wired to Claude Code yet &mdash; graft was used here as a plain
+command-line tool, so there was no agent session for it to record. The running
+total in this page therefore comes from adding up the banners by hand.</p>
+</div>
+</div>
+
+<h2>The decision rule</h2>
+<p>Five exchanges are enough to state the rule plainly.</p>
+<table>
+<tr><th>Reach for graft when&hellip;</th><th>Read the file instead when&hellip;</th></tr>
+<tr>
+<td>The question names a symbol &mdash; a function, type, or trait.</td>
+<td>The question is about intent, design, or why something exists.</td>
+</tr>
+<tr>
+<td>You want edges: callers, callees, blast radius.</td>
+<td>The answer is in a README, a design doc, or an ADR.</td>
+</tr>
+<tr>
+<td>You want a file's shape without its contents.</td>
+<td>The answer is in a manifest, a lockfile, or any config.</td>
+</tr>
+<tr>
+<td>The honest alternative is opening many files to find a few lines.</td>
+<td>You already know the one file and the one line.</td>
+</tr>
+</table>
+<p>Requests 1, 2 and 4 all failed the left column. Request 1 was about design and
+manifests. Requests 2 and 4 were about the conversation. Request 3 passed on
+every row, and graft answered it without a single source file being opened.</p>
+
+<h2>Five practical lessons</h2>
+<ol>
+<li><b>A failed graft command can be the most useful one.</b>
+<code>graft callers KvDispatch</code> returned nothing, but it named the
+symbol an <i>interface</i>. That one word reshaped the whole answer.</li>
+<li><b>Use symbol names with <code>callers</code>, not regular expressions
+with <code>grep</code>.</b> Three regex searches returned nothing on names
+that <code>callers</code> resolved immediately.</li>
+<li><b><code>graft grep</code> takes a regex, so punctuation bites.</b> A
+leading <code>+</code> is a syntax error, not a search term.</li>
+<li><b>Text hits are not call sites.</b> Of 102 hits for
+<code>KvDispatch</code>, most were doc comments and re-export lines. The
+graph finds the text; a person still decides what it means.</li>
+<li><b>Graft reports its own blind spots.</b> It warned that two functions share
+the name <code>read_kv_row_at</code> and that it drops ambiguous edges rather
+than guessing. Pass that warning on rather than hiding it.</li>
+</ol>
+
+<h2>What it actually cost, honestly</h2>
+<p>Graft prints a savings banner after each command. The banners in this session
+add up to roughly 4.7 million tokens. That number needs three caveats before
+anyone quotes it.</p>
+<ul>
+<li><b>It compares against the worst case.</b> <code>graft map</code> claimed
+4,301,987 tokens saved &mdash; measured against reading all 1,482 files. Nobody
+would ever do that.</li>
+<li><b>Repeated commands double-count.</b> The same
+<code>graft grep &quot;KvDispatch&quot;</code> ran twice in request 3 and both banners
+were summed. Correcting for that dropped the reported ~398,000 to nearer
+~223,000.</li>
+<li><b><code>graft stats</code> found no session to check the total
+against.</b> See tab 5.</li>
+</ul>
+<p>The defensible claim is narrower and still worth having: <b>request 3 was
+answered from 23 index queries with zero source files opened.</b> Reading the 30
+files that mention <code>KvDispatch</code> would have cost about 178,000
+tokens. The index queries cost a few thousand. That comparison is real, because
+reading those 30 files was the actual alternative.</p>
+
+<hr>
+<p class="foot">Built 8 September 2026. Every command output on this page is real
+output captured from a live run against
+a local clone of the repository, made so the original was never
+touched. Requests are quoted exactly as typed, spelling included.</p>
+
+
+</div>
+<script>
+document.querySelectorAll('.tabs').forEach(function (bar) {
+  var panels = document.querySelectorAll('#' + bar.dataset.group + ' > .panel');
+  var btns = bar.querySelectorAll('button');
+  btns.forEach(function (btn, i) {
+    btn.addEventListener('click', function () {
+      btns.forEach(function (b) { b.classList.remove('active'); });
+      panels.forEach(function (p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      panels[i].classList.add('active');
+    });
+  });
+});
+</script>
+</body>
+</html>
